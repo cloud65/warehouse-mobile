@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 export default function App() {
   return (
+    
     <View style={styles.container}>
       <Text style={styles.title}>Warehouse Mobile</Text>
       <Text style={styles.subtitle}>Сборка работает!</Text>
