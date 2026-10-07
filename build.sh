@@ -1,3 +1,4 @@
+cat > /opt/build.sh <<'EOF'
 #!/usr/bin/env bash
 
 set -euo pipefail
@@ -6,18 +7,19 @@ REPO="git@github.com:cloud65/warehouse-mobile.git"
 PROJECT_DIR="/opt/warehouse-mobile"
 IMAGE="warehouse-android-builder:latest"
 
-echo "==> Clone/update project"
+echo "========================================"
+echo " Warehouse Mobile Android Build"
+echo "========================================"
+echo
 
-if [[ -d "${PROJECT_DIR}/.git" ]]; then
-    echo "Project already exists, updating..."
-    git -C "${PROJECT_DIR}" pull --ff-only
-else
-    rm -rf "${PROJECT_DIR}"
-    git clone "${REPO}" "${PROJECT_DIR}"
-fi
+echo "==> Removing old project..."
+rm -rf "${PROJECT_DIR}"
+
+echo "==> Cloning repository..."
+git clone --branch master "${REPO}" "${PROJECT_DIR}"
 
 echo
-echo "==> Build Android APK"
+echo "==> Building Android APK..."
 
 podman run --rm \
     -v "${PROJECT_DIR}:/workspace:Z" \
@@ -31,8 +33,22 @@ podman run --rm \
 
 APK="${PROJECT_DIR}/android/app/build/outputs/apk/release/app-release.apk"
 
+if [[ ! -f "${APK}" ]]; then
+    echo
+    echo "ERROR: APK was not created."
+    exit 1
+fi
+
 echo
-echo "==> BUILD SUCCESSFUL"
-echo "APK: ${APK}"
+echo "========================================"
+echo " BUILD SUCCESSFUL"
+echo "========================================"
+echo
+echo "APK:"
+echo "${APK}"
+echo
 
 ls -lh "${APK}"
+EOF
+
+chmod +x /opt/build.sh
