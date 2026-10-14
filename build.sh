@@ -1,22 +1,26 @@
-cat > /opt/build.sh <<'EOF'
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -Eeuo pipefail
 
 REPO="git@github.com:cloud65/warehouse-mobile.git"
 PROJECT_DIR="/opt/warehouse-mobile"
 IMAGE="warehouse-android-builder:latest"
+BRANCH="master"
 
 echo "========================================"
 echo " Warehouse Mobile Android Build"
 echo "========================================"
 echo
 
-echo "==> Removing old project..."
-rm -rf "${PROJECT_DIR}"
-
-echo "==> Cloning repository..."
-git clone --branch master "${REPO}" "${PROJECT_DIR}"
+# Первоначальное клонирование или обновление проекта
+if [[ ! -d "${PROJECT_DIR}/.git" ]]; then
+    echo "==> Cloning repository..."
+    git clone --branch "${BRANCH}" "${REPO}" "${PROJECT_DIR}"
+else
+    echo "==> Updating repository..."
+    git -C "${PROJECT_DIR}" fetch origin "${BRANCH}"
+    git -C "${PROJECT_DIR}" reset --hard "origin/${BRANCH}"
+fi
 
 echo
 echo "==> Building Android APK..."
@@ -26,9 +30,31 @@ podman run --rm \
     -w /workspace \
     "${IMAGE}" \
     bash -lc '
-        npm install &&
-        cd android &&
-        ./gradlew assembleRelease --no-daemon
+        set -euo pipefail
+
+        echo "==> Installing npm dependencies..."
+        npm install
+
+        if [[ ! -f android/app/debug.keystore ]]; then
+            echo "==> Generating debug.keystore..."
+            keytool -genkeypair \
+                -keystore android/app/debug.keystore \
+                -storepass android \
+                -alias androiddebugkey \
+                -keypass android \
+                -keyalg RSA \
+                -keysize 2048 \
+                -validity 10000 \
+                -dname "CN=Android Debug,O=Android,C=US"
+        fi
+
+        echo "==> Running Gradle..."
+        cd android
+        ./gradlew assembleRelease \
+            --no-daemon \
+            --build-cache \
+            --parallel \
+            --console=plain
     '
 
 APK="${PROJECT_DIR}/android/app/build/outputs/apk/release/app-release.apk"
@@ -44,11 +70,5 @@ echo "========================================"
 echo " BUILD SUCCESSFUL"
 echo "========================================"
 echo
-echo "APK:"
-echo "${APK}"
-echo
-
+echo "APK: ${APK}"
 ls -lh "${APK}"
-EOF
-
-chmod +x /opt/build.sh
